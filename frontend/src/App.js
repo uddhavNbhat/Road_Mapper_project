@@ -9,6 +9,11 @@ import axios from "axios";
 import { format } from 'timeago.js';
 import Login from './components/Login';
 import Register from './components/Register';
+import mapboxSdk from '@mapbox/mapbox-sdk';
+import mapboxDirections from '@mapbox/mapbox-sdk/services/directions';
+
+const baseClient = mapboxSdk({ accessToken: 'pk.eyJ1IjoidWRkaGF2LTEyMzQiLCJhIjoiY2x2ajV1cG9hMWkwcTJxbzR1bXhrZTVjdCJ9.cuOWEW7TyoJNznIkkzx9lw' });
+const directionsClient = mapboxDirections(baseClient);
 
 function App() {
     const myStorage = window.localStorage;
@@ -31,6 +36,8 @@ function App() {
     const [route, setRoute] = useState(null);
     const [startLocation, setStartLocation] = useState(null);
     const [endLocation, setEndLocation] = useState(null);
+    const [showMaxDistanceError, setShowMaxDistanceError] = useState(false); // Max distance error popup state
+    const [showNoRouteFoundError, setShowNoRouteFoundError] = useState(false); // No route found error popup state
 
     useEffect(() => {
         const getPins = async () => {
@@ -48,22 +55,31 @@ function App() {
         getPins();
     }, []);
 
-    const fetchShortestPath = async (startId, endId) => {
+    const fetchShortestPath = async (startCoords, endCoords) => {
         try {
-            const res = await axios.get(`http://localhost:4050/pathroute/shortest-path?start=${startId}&end=${endId}`, {
-                headers: {
-                    'Authorization': myStorage.getItem("token")
-                }
-            });
-            if (res.data.route.length === 0) {
-                console.error('Route data is empty.');
+            const response = await directionsClient.getDirections({
+                waypoints: [
+                    { coordinates: startCoords },
+                    { coordinates: endCoords }
+                ],
+                profile: 'driving-traffic',
+                geometries: 'geojson'
+            }).send();
+
+            const directionsData = response.body.routes[0];
+            if (!directionsData) {
+                console.error('No route found.');
                 setRoute(null);
+                setShowNoRouteFoundError(true); // Show the no route found error popup
             } else {
-                console.log('Route data:', res.data.route);
-                setRoute(res.data.route);
+                console.log('Route data:', directionsData.geometry.coordinates);
+                setRoute(directionsData.geometry);
             }
         } catch (err) {
             console.log(err);
+            if (err.message.includes("Max distance exceeded")) { // Check for the specific error
+                setShowMaxDistanceError(true); // Show the max distance error popup
+            }
         }
     };
 
@@ -117,28 +133,23 @@ function App() {
 
         return {
             type: 'FeatureCollection',
-            features: route.map((p, i) => {
-                if (i < route.length - 1) {
-                    return {
-                        type: 'Feature',
-                        geometry: {
-                            type: 'LineString',
-                            coordinates: [
-                                [p.longitude, p.latitude],
-                                [route[i + 1].longitude, route[i + 1].latitude]
-                            ]
-                        },
-                        properties: {}
-                    };
+            features: [
+                {
+                    type: 'Feature',
+                    geometry: route,
+                    properties: {}
                 }
-                return null;
-            }).filter(f => f)
+            ]
         };
     };
 
     const handleSearch = () => {
         if (startLocation && endLocation) {
-            fetchShortestPath(startLocation, endLocation);
+            const startPin = pins.find(p => p._id === startLocation);
+            const endPin = pins.find(p => p._id === endLocation);
+            if (startPin && endPin) {
+                fetchShortestPath([startPin.longitude, startPin.latitude], [endPin.longitude, endPin.latitude]);
+            }
         }
     };
 
@@ -162,7 +173,7 @@ function App() {
             <Map
                 {...viewState}
                 mapboxAccessToken='pk.eyJ1IjoidWRkaGF2LTEyMzQiLCJhIjoiY2x2ajV1cG9hMWkwcTJxbzR1bXhrZTVjdCJ9.cuOWEW7TyoJNznIkkzx9lw'
-                mapStyle="mapbox://styles/uddhav-1234/clvghjw5t000u01pc00vthr25"
+                mapStyle="mapbox://styles/mapbox/streets-v11"
                 onMove={evt => setViewState(evt.viewState)}
                 touchZoomRotate={true}
                 onDblClick={handleAddClick}
@@ -249,6 +260,34 @@ function App() {
                             }}
                         />
                     </Source>
+                )}
+                {showMaxDistanceError && (
+                    <Popup
+                        longitude={viewState.longitude}
+                        latitude={viewState.latitude}
+                        anchor="top"
+                        closeButton={true}
+                        closeOnClick={false}
+                        onClose={() => setShowMaxDistanceError(false)}
+                    >
+                        <div className='error-popup'>
+                            <p>Max distance exceeded. Please select closer points.</p>
+                        </div>
+                    </Popup>
+                )}
+                {showNoRouteFoundError && (
+                    <Popup
+                        longitude={viewState.longitude}
+                        latitude={viewState.latitude}
+                        anchor="top"
+                        closeButton={true}
+                        closeOnClick={false}
+                        onClose={() => setShowNoRouteFoundError(false)}
+                    >
+                        <div className='error-popup'>
+                            <p>No route found. Please select different points.</p>
+                        </div>
+                    </Popup>
                 )}
                 {currentUser ?
                     (<button className='button logout' onClick={handleLogout}>Logout</button>) :
