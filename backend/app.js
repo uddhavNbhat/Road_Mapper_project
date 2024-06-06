@@ -11,11 +11,13 @@ app.use(cors());
 app.use(express.json());
 const pinroute = require('./routes/pinnedLocation');
 const userroute = require('./routes/userController');
+const pathRoute = require('./routes/pathRoute');
 const MONGODB_URL="mongodb://localhost:27017/MapProjectDatabase";
 
 
 app.use("/userController",userroute);
 app.use("/pinnedLocation",pinroute);
+app.use("/pathroute",pathRoute);
 
 mongoose.connect(MONGODB_URL).then(() =>{
     console.log("Connection done");

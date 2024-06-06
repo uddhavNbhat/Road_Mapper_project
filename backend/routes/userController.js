@@ -41,26 +41,15 @@ userroute.route("/login").post(async (req, res) => {
             return res.status(400).json("Wrong Username or Password");
         }
 
+        else{
         const token = jwt.sign({ _id: user._id, username }, 'Map_Token', { expiresIn: '1h' });
-
         res.status(200).json({ token, username });
+        }
     } catch (error) {
         console.error("Error in /login route:", error);
         res.status(500).json("Internal Server Error");
     }
 });
-
-const authenticateToken = (req, res, next) => {
-    const token = req.headers['authorization'];
-    if (!token) return res.status(401).json("Access Denied");
-
-    jwt.verify(token, "Map_Token", (err, user) => {
-        if (err) return res.status(403).json("Invalid Token");
-        req.user = user;
-        next();
-    });
-authenticateToken();
-};
 
 
 module.exports = userroute;

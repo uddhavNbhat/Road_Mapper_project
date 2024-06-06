@@ -1,7 +1,7 @@
 import './App.css';
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import Map, { Marker, Popup } from 'react-map-gl';
+import Map, { Marker, Popup, Source, Layer } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import RoomIcon from '@mui/icons-material/Room';
 import StarRateIcon from '@mui/icons-material/StarRate';
@@ -28,6 +28,9 @@ function App() {
     const [currentPlaceId, setCurrentPlaceId] = useState(null);
     const [showRegister, setShowRegister] = useState(false);
     const [showLogin, setShowLogin] = useState(false);
+    const [route, setRoute] = useState(null);
+    const [startLocation, setStartLocation] = useState(null);
+    const [endLocation, setEndLocation] = useState(null);
 
     useEffect(() => {
         const getPins = async () => {
@@ -44,6 +47,25 @@ function App() {
         };
         getPins();
     }, []);
+
+    const fetchShortestPath = async (startId, endId) => {
+        try {
+            const res = await axios.get(`http://localhost:4050/pathroute/shortest-path?start=${startId}&end=${endId}`, {
+                headers: {
+                    'Authorization': myStorage.getItem("token")
+                }
+            });
+            if (res.data.route.length === 0) {
+                console.error('Route data is empty.');
+                setRoute(null);
+            } else {
+                console.log('Route data:', res.data.route);
+                setRoute(res.data.route);
+            }
+        } catch (err) {
+            console.log(err);
+        }
+    };
 
     const handleMarkerClick = (id, lat, long) => {
         setCurrentPlaceId(id);
@@ -90,8 +112,53 @@ function App() {
         myStorage.removeItem("token");
     };
 
+    const getRouteGeoJSON = () => {
+        if (!route) return null;
+
+        return {
+            type: 'FeatureCollection',
+            features: route.map((p, i) => {
+                if (i < route.length - 1) {
+                    return {
+                        type: 'Feature',
+                        geometry: {
+                            type: 'LineString',
+                            coordinates: [
+                                [p.longitude, p.latitude],
+                                [route[i + 1].longitude, route[i + 1].latitude]
+                            ]
+                        },
+                        properties: {}
+                    };
+                }
+                return null;
+            }).filter(f => f)
+        };
+    };
+
+    const handleSearch = () => {
+        if (startLocation && endLocation) {
+            fetchShortestPath(startLocation, endLocation);
+        }
+    };
+
     return (
         <div className='map-container'>
+            <div className='search-bar'>
+                <select onChange={(e) => setStartLocation(e.target.value)} defaultValue="">
+                    <option value="" disabled>Select Start Location</option>
+                    {pins.map(p => (
+                        <option key={p._id} value={p._id}>{p.title}</option>
+                    ))}
+                </select>
+                <select onChange={(e) => setEndLocation(e.target.value)} defaultValue="">
+                    <option value="" disabled>Select End Location</option>
+                    {pins.map(p => (
+                        <option key={p._id} value={p._id}>{p.title}</option>
+                    ))}
+                </select>
+                <button onClick={handleSearch}>Show Path</button>
+            </div>
             <Map
                 {...viewState}
                 mapboxAccessToken='pk.eyJ1IjoidWRkaGF2LTEyMzQiLCJhIjoiY2x2ajV1cG9hMWkwcTJxbzR1bXhrZTVjdCJ9.cuOWEW7TyoJNznIkkzx9lw'
@@ -170,6 +237,18 @@ function App() {
                             </form>
                         </div>
                     </Popup>
+                )}
+                {route && (
+                    <Source id="route" type="geojson" data={getRouteGeoJSON()}>
+                        <Layer
+                            id="route"
+                            type="line"
+                            paint={{
+                                'line-color': 'blue',
+                                'line-width': 3
+                            }}
+                        />
+                    </Source>
                 )}
                 {currentUser ?
                     (<button className='button logout' onClick={handleLogout}>Logout</button>) :
