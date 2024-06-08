@@ -36,8 +36,9 @@ function App() {
     const [route, setRoute] = useState(null);
     const [startLocation, setStartLocation] = useState(null);
     const [endLocation, setEndLocation] = useState(null);
-    const [showMaxDistanceError, setShowMaxDistanceError] = useState(false); // Max distance error popup state
-    const [showNoRouteFoundError, setShowNoRouteFoundError] = useState(false); // No route found error popup state
+    const [intermediatePoints, setIntermediatePoints] = useState([]);
+    const [showMaxDistanceError, setShowMaxDistanceError] = useState(false);
+    const [showNoRouteFoundError, setShowNoRouteFoundError] = useState(false);
 
     useEffect(() => {
         const getPins = async () => {
@@ -55,32 +56,44 @@ function App() {
         getPins();
     }, []);
 
-    const fetchShortestPath = async (startCoords, endCoords) => {
+    const fetchShortestPath = async (startCoords, intermediateCoords, endCoords) => {
         try {
+            const waypoints = [
+                { coordinates: startCoords },
+                ...intermediateCoords.map(coords => ({ coordinates: coords })),
+                { coordinates: endCoords }
+            ];
             const response = await directionsClient.getDirections({
-                waypoints: [
-                    { coordinates: startCoords },
-                    { coordinates: endCoords }
-                ],
+                waypoints,
                 profile: 'driving-traffic',
                 geometries: 'geojson'
             }).send();
-
             const directionsData = response.body.routes[0];
             if (!directionsData) {
                 console.error('No route found.');
                 setRoute(null);
-                setShowNoRouteFoundError(true); // Show the no route found error popup
+                setShowNoRouteFoundError(true);
             } else {
                 console.log('Route data:', directionsData.geometry.coordinates);
                 setRoute(directionsData.geometry);
             }
         } catch (err) {
             console.log(err);
-            if (err.message.includes("Max distance exceeded")) { // Check for the specific error
-                setShowMaxDistanceError(true); // Show the max distance error popup
+            if (err.message.includes("Max distance exceeded")) {
+                setShowMaxDistanceError(true);
             }
         }
+    };
+
+    const handleAddIntermediatePoint = (pointId) => {
+        const point = pins.find(p => p._id === pointId);
+        if (point) {
+            setIntermediatePoints([...intermediatePoints, point]);
+        }
+    };
+
+    const handleRemoveIntermediatePoint = (pointId) => {
+        setIntermediatePoints(intermediatePoints.filter(p => p._id !== pointId));
     };
 
     const handleMarkerClick = (id, lat, long) => {
@@ -147,8 +160,9 @@ function App() {
         if (startLocation && endLocation) {
             const startPin = pins.find(p => p._id === startLocation);
             const endPin = pins.find(p => p._id === endLocation);
+            const intermediateCoords = intermediatePoints.map(p => [p.longitude, p.latitude]);
             if (startPin && endPin) {
-                fetchShortestPath([startPin.longitude, startPin.latitude], [endPin.longitude, endPin.latitude]);
+                fetchShortestPath([startPin.longitude, startPin.latitude], intermediateCoords, [endPin.longitude, endPin.latitude]);
             }
         }
     };
@@ -168,7 +182,20 @@ function App() {
                         <option key={p._id} value={p._id}>{p.title}</option>
                     ))}
                 </select>
-                <button onClick={handleSearch}>Show Path</button>
+                <div>
+                    {pins.map(p => (
+                        <div key={p._id}>
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    onChange={(e) => e.target.checked ? handleAddIntermediatePoint(p._id) : handleRemoveIntermediatePoint(p._id)}
+                                />
+                                {p.title}
+                            </label>
+                        </div>
+                    ))}
+                </div>
+                <button onClick={handleSearch} style={{color:"slateblue",borderRadius:"3px"}}>Show Path</button>
             </div>
             <Map
                 {...viewState}
