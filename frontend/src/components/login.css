@@ -44,3 +44,22 @@
     color: red;
     text-align: center;
   }
+
+  .intermediate-points {
+    margin-top: 10px;
+}
+
+.intermediate-points-title {
+    font-weight: bold;
+    color: blue;
+    margin-bottom: 5px;
+}
+
+.intermediate-point {
+    margin-bottom: 5px;
+}
+
+.intermediate-point-title {
+    color: blue;
+    font-weight: bold;
+}

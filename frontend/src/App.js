@@ -88,12 +88,25 @@ function App() {
     const handleAddIntermediatePoint = (pointId) => {
         const point = pins.find(p => p._id === pointId);
         if (point) {
-            setIntermediatePoints([...intermediatePoints, point]);
+            // Exclude source and destination points from being added as intermediate points
+            if (point._id !== startLocation && point._id !== endLocation) {
+                // Assign priority based on the current number of intermediate points
+                const priority = intermediatePoints.length + 1;
+                setIntermediatePoints([...intermediatePoints, { ...point, priority }]);
+            }
         }
     };
-
     const handleRemoveIntermediatePoint = (pointId) => {
+        // Remove the point with the specified ID
         setIntermediatePoints(intermediatePoints.filter(p => p._id !== pointId));
+        // Update priorities of remaining intermediate points
+        const updatedIntermediatePoints = intermediatePoints
+            .filter(p => p._id !== pointId)
+            .map((point, index) => ({
+                ...point,
+                priority: index + 1
+            }));
+        setIntermediatePoints(updatedIntermediatePoints);
     };
 
     const handleMarkerClick = (id, lat, long) => {
@@ -170,33 +183,37 @@ function App() {
     return (
         <div className='map-container'>
             <div className='search-bar'>
-                <select onChange={(e) => setStartLocation(e.target.value)} defaultValue="">
-                    <option value="" disabled>Select Start Location</option>
-                    {pins.map(p => (
-                        <option key={p._id} value={p._id}>{p.title}</option>
-                    ))}
-                </select>
-                <select onChange={(e) => setEndLocation(e.target.value)} defaultValue="">
-                    <option value="" disabled>Select End Location</option>
-                    {pins.map(p => (
-                        <option key={p._id} value={p._id}>{p.title}</option>
-                    ))}
-                </select>
-                <div>
-                    {pins.map(p => (
-                        <div key={p._id}>
-                            <label>
-                                <input
-                                    type="checkbox"
-                                    onChange={(e) => e.target.checked ? handleAddIntermediatePoint(p._id) : handleRemoveIntermediatePoint(p._id)}
-                                />
-                                {p.title}
-                            </label>
-                        </div>
-                    ))}
+    <select onChange={(e) => setStartLocation(e.target.value)} defaultValue="">
+        <option value="" disabled>Select Start Location</option>
+        {pins.map(p => (
+            <option key={p._id} value={p._id}>{p.title}</option>
+        ))}
+    </select>
+    <select onChange={(e) => setEndLocation(e.target.value)} defaultValue="">
+        <option value="" disabled>Select End Location</option>
+        {pins.map(p => (
+            <option key={p._id} value={p._id}>{p.title}</option>
+        ))}
+    </select>
+    <div className="intermediate-points">
+        <div className="intermediate-points-title">Intermediate Points:</div>
+        {pins.map(p => (
+            (p._id !== startLocation && p._id !== endLocation) && (
+                <div key={p._id} className="intermediate-point">
+                    <label>
+                        <input
+                            type="checkbox"
+                            onChange={(e) => e.target.checked ? handleAddIntermediatePoint(p._id) : handleRemoveIntermediatePoint(p._id)}
+                        />
+                        <span className="intermediate-point-title">{p.title}</span>
+                    </label>
                 </div>
-                <button onClick={handleSearch} style={{color:"slateblue",borderRadius:"3px"}}>Show Path</button>
-            </div>
+            )
+        ))}
+    </div>
+    <button onClick={handleSearch} style={{ color: "slateblue", borderRadius: "3px" }}>Show Path</button>
+</div>
+
             <Map
                 {...viewState}
                 mapboxAccessToken='pk.eyJ1IjoidWRkaGF2LTEyMzQiLCJhIjoiY2x2ajV1cG9hMWkwcTJxbzR1bXhrZTVjdCJ9.cuOWEW7TyoJNznIkkzx9lw'
