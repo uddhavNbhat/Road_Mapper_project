@@ -88,18 +88,14 @@ function App() {
     const handleAddIntermediatePoint = (pointId) => {
         const point = pins.find(p => p._id === pointId);
         if (point) {
-            // Exclude source and destination points from being added as intermediate points
             if (point._id !== startLocation && point._id !== endLocation) {
-                // Assign priority based on the current number of intermediate points
                 const priority = intermediatePoints.length + 1;
                 setIntermediatePoints([...intermediatePoints, { ...point, priority }]);
             }
         }
     };
     const handleRemoveIntermediatePoint = (pointId) => {
-        // Remove the point with the specified ID
         setIntermediatePoints(intermediatePoints.filter(p => p._id !== pointId));
-        // Update priorities of remaining intermediate points
         const updatedIntermediatePoints = intermediatePoints
             .filter(p => p._id !== pointId)
             .map((point, index) => ({
